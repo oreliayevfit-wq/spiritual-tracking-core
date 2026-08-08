@@ -29,6 +29,11 @@ export interface CreateLeadInput {
   fbclid?: string | null;
   fbp?: string | null;
   fbc?: string | null;
+  // Merged into the canonical "lead" event's metadata alongside leadId — e.g.
+  // the raw form fields a consuming app collected that don't map onto a named
+  // column here. Full fidelity of what the visitor actually submitted stays
+  // recoverable even when this table's fixed columns don't cover it.
+  eventMetadata?: Record<string, unknown>;
 }
 
 /**
@@ -82,7 +87,7 @@ export async function createLeadTransactional(db: TrackingDb, input: CreateLeadI
         sessionId: input.sessionId,
         eventName: "lead",
         page: input.landingPage ?? null,
-        metadata: { leadId: lead.id },
+        metadata: { leadId: lead.id, ...input.eventMetadata },
         experimentId: input.experimentId ?? null,
         variantId: input.variantId ?? null,
         occurredAt: lead.createdAt,
