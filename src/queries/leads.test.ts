@@ -64,4 +64,69 @@ describe("createLeadTransactional", () => {
     expect(lead.email).toBe("no-context@example.com");
     expect(lead.visitorId).toBeNull();
   });
+
+  it("returns the same lead instead of duplicating on a rapid repeat submission (same email+visitor)", async () => {
+    const db = await createTestDb();
+    await seed(db);
+
+    const first = await createLeadTransactional(db, {
+      visitorId: VISITOR_ID,
+      sessionId: SESSION_ID,
+      email: "dup@example.com",
+    });
+    const second = await createLeadTransactional(db, {
+      visitorId: VISITOR_ID,
+      sessionId: SESSION_ID,
+      email: "dup@example.com",
+    });
+
+    expect(second.id).toBe(first.id);
+    const rows = await db.select().from(leads).where(eq(leads.email, "dup@example.com"));
+    expect(rows).toHaveLength(1);
+  });
+
+  it("does NOT merge two concurrent submissions racing each other (advisory lock serializes them)", async () => {
+    const db = await createTestDb();
+    await seed(db);
+
+    const [a, b] = await Promise.all([
+      createLeadTransactional(db, { visitorId: VISITOR_ID, sessionId: SESSION_ID, email: "race@example.com" }),
+      createLeadTransactional(db, { visitorId: VISITOR_ID, sessionId: SESSION_ID, email: "race@example.com" }),
+    ]);
+
+    expect(a.id).toBe(b.id);
+    const rows = await db.select().from(leads).where(eq(leads.email, "race@example.com"));
+    expect(rows).toHaveLength(1);
+  });
+
+  it("does NOT treat the same email from a different visitor as a duplicate", async () => {
+    const db = await createTestDb();
+    await seed(db);
+    const otherVisitorId = "f0000000-0000-0000-0000-000000000099";
+    await db.insert(visitors).values({ id: otherVisitorId });
+
+    const first = await createLeadTransactional(db, { visitorId: VISITOR_ID, email: "shared@example.com" });
+    const second = await createLeadTransactional(db, { visitorId: otherVisitorId, email: "shared@example.com" });
+
+    expect(second.id).not.toBe(first.id);
+    const rows = await db.select().from(leads).where(eq(leads.email, "shared@example.com"));
+    expect(rows).toHaveLength(2);
+  });
+
+  it("creates a genuinely new lead once the duplicate window has passed", async () => {
+    const db = await createTestDb();
+    await seed(db);
+
+    const first = await createLeadTransactional(db, { visitorId: VISITOR_ID, email: "later@example.com" });
+    await db
+      .update(leads)
+      .set({ createdAt: new Date(Date.now() - 60_000) })
+      .where(eq(leads.id, first.id));
+
+    const second = await createLeadTransactional(db, { visitorId: VISITOR_ID, email: "later@example.com" });
+
+    expect(second.id).not.toBe(first.id);
+    const rows = await db.select().from(leads).where(eq(leads.email, "later@example.com"));
+    expect(rows).toHaveLength(2);
+  });
 });

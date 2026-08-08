@@ -1,7 +1,13 @@
-import { eq } from "drizzle-orm";
+import { eq, and, gt, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { events, leads, visitors } from "../schema";
 import type { TrackingDb } from "../client";
+
+// Protects against a double-click or a network retry firing the same
+// submission twice in quick succession — not a "one lead per email ever"
+// rule. A genuinely new inquiry from the same address after this window
+// still creates a new lead row.
+const DUPLICATE_LEAD_WINDOW_MS = 30_000;
 
 export interface CreateLeadInput {
   visitorId?: string | null;
@@ -44,9 +50,29 @@ export interface CreateLeadInput {
  * This is the business-critical path — callers must await it and only report
  * success to the end user once it resolves. Nothing here talks to Rav Messer
  * or Meta; those are strictly downstream of a successful commit.
+ *
+ * Idempotent-ish against duplicate submissions: an advisory lock scoped to
+ * this transaction serializes concurrent calls for the same email (so two
+ * near-simultaneous requests from a real double-click can't both pass the
+ * duplicate check before either commits), and a lead created for the same
+ * email+visitor within the last 30s is returned as-is instead of duplicated.
  */
 export async function createLeadTransactional(db: TrackingDb, input: CreateLeadInput) {
   return db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${input.email}))`);
+
+    const cutoff = new Date(Date.now() - DUPLICATE_LEAD_WINDOW_MS);
+    const recentDuplicate = await tx.query.leads.findFirst({
+      where: and(
+        eq(leads.email, input.email),
+        input.visitorId ? eq(leads.visitorId, input.visitorId) : undefined,
+        gt(leads.createdAt, cutoff),
+      ),
+    });
+    if (recentDuplicate) {
+      return recentDuplicate;
+    }
+
     const leadId = randomUUID();
     const [lead] = await tx
       .insert(leads)
