@@ -1,0 +1,32 @@
+{
+  "name": "@spiritual/tracking-core",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Shared Drizzle schema + typed query helpers for spiritual-* marketing tracking (visitors/sessions/events/leads). Consumed as a git-tag-pinned dependency by spiritual-marketing-site and spiritual-business-dashboard.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "drizzle"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "prepare": "npm run build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc",
+    "db:generate": "drizzle-kit generate"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.2",
+    "pg": "^8.22.0"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.4",
+    "@types/node": "^20",
+    "@types/pg": "^8.20.3",
+    "drizzle-kit": "^0.31.10",
+    "typescript": "^5",
+    "vitest": "^2.1.8"
+  }
+}

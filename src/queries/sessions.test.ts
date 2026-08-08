@@ -1,0 +1,82 @@
+import { eq, sql } from "drizzle-orm";
+import { createTestDb } from "../testSupport";
+import { visitors, sessions } from "../schema";
+import { upsertSession } from "./sessions";
+
+const VISITOR_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+const SESSION_ID = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+
+async function seedVisitor(db: Awaited<ReturnType<typeof createTestDb>>) {
+  await db.insert(visitors).values({ id: VISITOR_ID });
+}
+
+describe("upsertSession", () => {
+  it("creates a new session on first sight, keeping the client-supplied id", async () => {
+    const db = await createTestDb();
+    await seedVisitor(db);
+
+    const row = await upsertSession(db, {
+      sessionId: SESSION_ID,
+      visitorId: VISITOR_ID,
+      siteKey: "main",
+      utmSource: "facebook",
+    });
+
+    expect(row.id).toBe(SESSION_ID);
+    expect(row.utmSource).toBe("facebook");
+  });
+
+  it("touches lastSeenAt on a repeat call within the 30-minute window, keeping the same id and attribution", async () => {
+    const db = await createTestDb();
+    await seedVisitor(db);
+    const first = await upsertSession(db, {
+      sessionId: SESSION_ID,
+      visitorId: VISITOR_ID,
+      siteKey: "main",
+      utmSource: "facebook",
+    });
+
+    await new Promise((r) => setTimeout(r, 5));
+    const second = await upsertSession(db, {
+      sessionId: SESSION_ID,
+      visitorId: VISITOR_ID,
+      siteKey: "main",
+      utmSource: "google", // should be ignored — same session, attribution is fixed at creation
+    });
+
+    expect(second.id).toBe(SESSION_ID);
+    expect(second.utmSource).toBe("facebook");
+    expect(second.lastSeenAt.getTime()).toBeGreaterThan(first.lastSeenAt.getTime());
+  });
+
+  it("mints a brand-new session id when the existing session is stale (>30min), even though the client sent the old id", async () => {
+    const db = await createTestDb();
+    await seedVisitor(db);
+    await upsertSession(db, {
+      sessionId: SESSION_ID,
+      visitorId: VISITOR_ID,
+      siteKey: "main",
+      utmSource: "facebook",
+    });
+
+    // Simulate 31 minutes passing by backdating lastSeenAt directly.
+    await db
+      .update(sessions)
+      .set({ lastSeenAt: sql`now() - interval '31 minutes'` })
+      .where(eq(sessions.id, SESSION_ID));
+
+    const stale = await upsertSession(db, {
+      sessionId: SESSION_ID,
+      visitorId: VISITOR_ID,
+      siteKey: "main",
+      utmSource: "google",
+      utmCampaign: "new-visit-campaign",
+    });
+
+    expect(stale.id).not.toBe(SESSION_ID);
+    expect(stale.utmSource).toBe("google");
+
+    const [oldRow] = await db.select().from(sessions).where(eq(sessions.id, SESSION_ID));
+    expect(oldRow.utmSource).toBe("facebook"); // untouched — a distinct row now
+  });
+});
