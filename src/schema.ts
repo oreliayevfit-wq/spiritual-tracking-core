@@ -6,6 +6,7 @@ import {
   timestamp,
   jsonb,
   boolean,
+  integer,
   index,
 } from "drizzle-orm/pg-core";
 
@@ -192,3 +193,49 @@ export const trackingSites = pgTable("tracking_sites", {
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// Structured log for downstream integration failures (Meta CAPI, Rav Messer,
+// rejected tracking payloads) — read by whoever is debugging a "why didn't
+// this lead sync" question, not surfaced to end users.
+export const INTEGRATION_LOG_LEVELS = ["info", "warn", "error"] as const;
+export type IntegrationLogLevel = (typeof INTEGRATION_LOG_LEVELS)[number];
+
+export const integrationLogs = pgTable(
+  "integration_logs",
+  {
+    id: uuid("id").primaryKey(),
+    source: varchar("source", { length: 32 }).notNull(), // "meta_capi" | "ravmesser" | "tracking_ingest"
+    level: varchar("level", { length: 16 }).notNull(),
+    message: text("message").notNull(),
+    context: jsonb("context"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("integration_logs_source_idx").on(table.source),
+    index("integration_logs_created_at_idx").on(table.createdAt),
+  ],
+);
+
+// Retry queue for failed Rav Messer syncs. A lead's DB row is always written
+// first (see createLeadTransactional) — this table exists purely to retry the
+// downstream contact-sync later; it is never in the critical path of lead
+// capture.
+export const RAV_MESSER_JOB_STATUSES = ["pending", "processing", "succeeded", "failed"] as const;
+export type RavMesserJobStatus = (typeof RAV_MESSER_JOB_STATUSES)[number];
+
+export const ravMesserSyncJobs = pgTable(
+  "rav_messer_sync_jobs",
+  {
+    id: uuid("id").primaryKey(),
+    leadId: uuid("lead_id")
+      .notNull()
+      .references(() => leads.id),
+    attempt: integer("attempt").notNull().default(0),
+    status: varchar("status", { length: 16 }).notNull().default("pending"),
+    lastError: text("last_error"),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("rav_messer_sync_jobs_status_next_attempt_idx").on(table.status, table.nextAttemptAt)],
+);

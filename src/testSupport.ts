@@ -151,5 +151,29 @@ export async function createTestDb(): Promise<TrackingDb> {
     );
   `);
 
+  await testDb.execute(sql`
+    CREATE TABLE integration_logs (
+      id uuid PRIMARY KEY,
+      source varchar(32) NOT NULL,
+      level varchar(16) NOT NULL,
+      message text NOT NULL,
+      context jsonb,
+      created_at timestamptz NOT NULL DEFAULT now()
+    );
+  `);
+
+  await testDb.execute(sql`
+    CREATE TABLE rav_messer_sync_jobs (
+      id uuid PRIMARY KEY,
+      lead_id uuid NOT NULL REFERENCES leads(id),
+      attempt integer NOT NULL DEFAULT 0,
+      status varchar(16) NOT NULL DEFAULT 'pending',
+      last_error text,
+      next_attempt_at timestamptz NOT NULL DEFAULT now(),
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );
+  `);
+
   return testDb as unknown as TrackingDb;
 }

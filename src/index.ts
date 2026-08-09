@@ -1,5 +1,5 @@
 export * as schema from "./schema";
-export type { RavMesserSyncStatus } from "./schema";
+export type { RavMesserSyncStatus, RavMesserJobStatus, IntegrationLogLevel } from "./schema";
 
 export { createTrackingDb } from "./client";
 export type { TrackingDb } from "./client";
@@ -18,3 +18,17 @@ export type { CreateLeadInput } from "./queries/leads";
 
 export { hasRealTouchSignal, isKnownAdReferrer } from "./attribution";
 export type { TouchSignal } from "./attribution";
+
+export { logIntegrationEvent } from "./queries/integrationLogs";
+export type { LogIntegrationEventInput } from "./queries/integrationLogs";
+
+export {
+  enqueueRavMesserSyncJob,
+  claimDueRavMesserSyncJobs,
+  completeRavMesserSyncJob,
+  failRavMesserSyncJob,
+  updateLeadRavMesserStatus,
+  getLeadForJob,
+  nextBackoffMs,
+} from "./queries/ravMesserSyncJobs";
+export type { RavMesserLeadStatusUpdate } from "./queries/ravMesserSyncJobs";
