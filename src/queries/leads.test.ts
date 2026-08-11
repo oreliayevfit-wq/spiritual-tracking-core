@@ -175,4 +175,54 @@ describe("createLeadTransactional", () => {
 
     expect(lead.isTest).toBe(false);
   });
+
+  describe("testRunId — test-mode isolation hardening", () => {
+    const RUN_ID = "f0000000-0000-0000-0000-0000000000aa";
+
+    it("stamps testRunId on the lead, its canonical event, and the linked visitor", async () => {
+      const db = await createTestDb();
+      await seed(db);
+
+      const { lead } = await createLeadTransactional(db, {
+        visitorId: VISITOR_ID,
+        sessionId: SESSION_ID,
+        email: "run-stamped@example.com",
+        isTest: true,
+        testRunId: RUN_ID,
+      });
+      expect(lead.testRunId).toBe(RUN_ID);
+
+      const [leadEvent] = await db.select().from(events).where(eq(events.eventName, "lead"));
+      expect(leadEvent.testRunId).toBe(RUN_ID);
+
+      const [visitor] = await db.select().from(visitors).where(eq(visitors.id, VISITOR_ID));
+      expect(visitor.testRunId).toBe(RUN_ID);
+    });
+
+    it("defaults testRunId to null on the lead when not provided", async () => {
+      const db = await createTestDb();
+      await seed(db);
+
+      const { lead } = await createLeadTransactional(db, {
+        visitorId: VISITOR_ID,
+        sessionId: SESSION_ID,
+        email: "no-run@example.com",
+      });
+      expect(lead.testRunId).toBeNull();
+    });
+
+    it("does NOT touch the visitor's testRunId when this call isn't itself a test", async () => {
+      const db = await createTestDb();
+      await seed(db);
+      // First, a real test run stamps the visitor.
+      await createLeadTransactional(db, { visitorId: VISITOR_ID, sessionId: SESSION_ID, email: "a@example.com", isTest: true, testRunId: RUN_ID });
+      // Then a genuinely real (non-test) lead from the SAME visitor — must
+      // not overwrite or clear the visitor's historical testRunId, matching
+      // upsertVisitor's own "omit -> preserve" semantics.
+      await createLeadTransactional(db, { visitorId: VISITOR_ID, sessionId: SESSION_ID, email: "b@example.com" });
+
+      const [visitor] = await db.select().from(visitors).where(eq(visitors.id, VISITOR_ID));
+      expect(visitor.testRunId).toBe(RUN_ID);
+    });
+  });
 });

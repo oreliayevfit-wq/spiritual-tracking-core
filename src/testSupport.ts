@@ -53,6 +53,8 @@ export async function createTestDb(): Promise<TrackingDb> {
       os varchar(64),
       lead_id uuid,
       is_test boolean NOT NULL DEFAULT false,
+      test_run_id uuid,
+      test_classification varchar(32),
       created_at timestamptz NOT NULL DEFAULT now()
     );
   `);
@@ -88,7 +90,8 @@ export async function createTestDb(): Promise<TrackingDb> {
       language varchar(32),
       site_key varchar(64) NOT NULL,
       is_bot boolean NOT NULL DEFAULT false,
-      is_test boolean NOT NULL DEFAULT false
+      is_test boolean NOT NULL DEFAULT false,
+      test_run_id uuid
     );
   `);
 
@@ -103,7 +106,8 @@ export async function createTestDb(): Promise<TrackingDb> {
       metadata jsonb,
       experiment_id uuid,
       variant_id uuid,
-      is_test boolean NOT NULL DEFAULT false
+      is_test boolean NOT NULL DEFAULT false,
+      test_run_id uuid
     );
   `);
 
@@ -141,6 +145,7 @@ export async function createTestDb(): Promise<TrackingDb> {
       rav_messer_synced_at timestamptz,
       rav_messer_error text,
       is_test boolean NOT NULL DEFAULT false,
+      test_run_id uuid,
       created_at timestamptz NOT NULL DEFAULT now()
     );
   `);

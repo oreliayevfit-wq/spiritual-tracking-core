@@ -24,6 +24,11 @@ export interface VisitorTouchInput {
   browser?: string | null;
   os?: string | null;
   isTest?: boolean;
+  // Test-mode isolation hardening — see schema.ts's testRunId comment. NOT
+  // escalate-only, unlike isTest: a fresh testRunId overwrites the stored
+  // one (a new test session on the same visitor is a genuinely different
+  // run), while omitting it entirely preserves whatever was already there.
+  testRunId?: string | null;
 }
 
 /**
@@ -75,6 +80,7 @@ export async function upsertVisitor(db: TrackingDb, input: VisitorTouchInput) {
         browser: input.browser ?? null,
         os: input.os ?? null,
         isTest: input.isTest ?? false,
+        testRunId: input.testRunId ?? null,
       })
       .returning();
     return row;
@@ -98,6 +104,9 @@ export async function upsertVisitor(db: TrackingDb, input: VisitorTouchInput) {
       // once, it stays flagged as test forever — never downgraded back to
       // false by a later non-test touch.
       isTest: existing.isTest || (input.isTest ?? false),
+      // NOT escalate-only — a fresh testRunId (a new, distinct test session)
+      // overwrites the stored one; omitting it preserves whatever was there.
+      testRunId: input.testRunId ?? existing.testRunId,
       ...(touched
         ? {
             lastTouchSource: input.source ?? null,

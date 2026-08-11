@@ -33,6 +33,8 @@ export interface SessionInput {
   screenSize?: string | null;
   language?: string | null;
   isTest?: boolean;
+  // See visitors.ts's testRunId comment — same semantics (not escalate-only).
+  testRunId?: string | null;
 }
 
 /**
@@ -81,6 +83,7 @@ export async function upsertSession(db: TrackingDb, input: SessionInput) {
         screenSize: input.screenSize ?? null,
         language: input.language ?? null,
         isTest: input.isTest ?? false,
+        testRunId: input.testRunId ?? null,
       })
       .returning();
     return row;
@@ -88,7 +91,11 @@ export async function upsertSession(db: TrackingDb, input: SessionInput) {
 
   const [row] = await db
     .update(sessions)
-    .set({ lastSeenAt: now, isTest: existing.isTest || (input.isTest ?? false) })
+    .set({
+      lastSeenAt: now,
+      isTest: existing.isTest || (input.isTest ?? false),
+      testRunId: input.testRunId ?? existing.testRunId,
+    })
     .where(eq(sessions.id, existing.id))
     .returning();
   return row;

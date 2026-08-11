@@ -46,4 +46,28 @@ describe("insertEvent", () => {
     });
     expect(test.isTest).toBe(true);
   });
+
+  it("stores testRunId when provided, defaults to null otherwise", async () => {
+    const db = await createTestDb();
+    await db.insert(visitors).values({ id: VISITOR_ID });
+    await db.insert(sessions).values({ id: SESSION_ID, visitorId: VISITOR_ID, siteKey: "main" });
+
+    const withRun = await insertEvent(db, {
+      id: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeee01",
+      visitorId: VISITOR_ID,
+      sessionId: SESSION_ID,
+      eventName: "page_view",
+      isTest: true,
+      testRunId: "ffffffff-ffff-ffff-ffff-ffffffffffff",
+    });
+    expect(withRun.testRunId).toBe("ffffffff-ffff-ffff-ffff-ffffffffffff");
+
+    const withoutRun = await insertEvent(db, {
+      id: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeee02",
+      visitorId: VISITOR_ID,
+      sessionId: SESSION_ID,
+      eventName: "page_view",
+    });
+    expect(withoutRun.testRunId).toBeNull();
+  });
 });

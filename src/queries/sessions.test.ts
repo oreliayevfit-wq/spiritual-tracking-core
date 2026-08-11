@@ -100,4 +100,27 @@ describe("upsertSession", () => {
     });
     expect(touched.isTest).toBe(true);
   });
+
+  describe("testRunId — test-mode isolation hardening", () => {
+    it("stores testRunId on creation, defaulting to null when not provided", async () => {
+      const db = await createTestDb();
+      await seedVisitor(db);
+
+      const withRun = await upsertSession(db, { sessionId: SESSION_ID, visitorId: VISITOR_ID, siteKey: "main", testRunId: "cccccccc-cccc-cccc-cccc-cccccccccccc" });
+      expect(withRun.testRunId).toBe("cccccccc-cccc-cccc-cccc-cccccccccccc");
+
+      const otherSessionId = "dddddddd-dddd-dddd-dddd-dddddddddddd";
+      const withoutRun = await upsertSession(db, { sessionId: otherSessionId, visitorId: VISITOR_ID, siteKey: "main" });
+      expect(withoutRun.testRunId).toBeNull();
+    });
+
+    it("a touch within the same session preserves the stored testRunId when none is supplied", async () => {
+      const db = await createTestDb();
+      await seedVisitor(db);
+      await upsertSession(db, { sessionId: SESSION_ID, visitorId: VISITOR_ID, siteKey: "main", testRunId: "cccccccc-cccc-cccc-cccc-cccccccccccc" });
+
+      const touched = await upsertSession(db, { sessionId: SESSION_ID, visitorId: VISITOR_ID, siteKey: "main" });
+      expect(touched.testRunId).toBe("cccccccc-cccc-cccc-cccc-cccccccccccc");
+    });
+  });
 });

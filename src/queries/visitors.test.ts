@@ -97,4 +97,56 @@ describe("upsertVisitor", () => {
     const after = await upsertVisitor(db, { visitorId: id, isTest: false });
     expect(after.isTest).toBe(true);
   });
+
+  describe("testRunId — test-mode isolation hardening", () => {
+    it("stores testRunId on creation", async () => {
+      const db = await createTestDb();
+      const id = "88888888-8888-8888-8888-888888888888";
+      const runId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+
+      const row = await upsertVisitor(db, { visitorId: id, isTest: true, testRunId: runId });
+      expect(row.testRunId).toBe(runId);
+    });
+
+    it("defaults testRunId to null when not provided", async () => {
+      const db = await createTestDb();
+      const id = "99999999-9999-9999-9999-999999999999";
+
+      const row = await upsertVisitor(db, { visitorId: id });
+      expect(row.testRunId).toBeNull();
+    });
+
+    it("a later touch with a NEW testRunId overwrites it — NOT escalate-only, unlike isTest", async () => {
+      const db = await createTestDb();
+      const id = "10101010-1010-1010-1010-101010101010";
+      const runA = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+      const runB = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+
+      await upsertVisitor(db, { visitorId: id, isTest: true, testRunId: runA });
+      const second = await upsertVisitor(db, { visitorId: id, isTest: true, testRunId: runB });
+      expect(second.testRunId).toBe(runB);
+    });
+
+    it("a later touch with NO testRunId preserves the previously stored one", async () => {
+      const db = await createTestDb();
+      const id = "20202020-2020-2020-2020-202020202020";
+      const runA = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+
+      await upsertVisitor(db, { visitorId: id, isTest: true, testRunId: runA });
+      // A subsequent REAL (non-test) touch that supplies no testRunId at all
+      // — e.g. the visitor's normal traffic after their test session ended.
+      const second = await upsertVisitor(db, { visitorId: id });
+      expect(second.testRunId).toBe(runA);
+    });
+  });
+
+  describe("testClassification — re-audit support", () => {
+    it("defaults to null and is never set implicitly by a normal touch", async () => {
+      const db = await createTestDb();
+      const id = "30303030-3030-3030-3030-303030303030";
+
+      const row = await upsertVisitor(db, { visitorId: id, isTest: true });
+      expect(row.testClassification).toBeNull();
+    });
+  });
 });

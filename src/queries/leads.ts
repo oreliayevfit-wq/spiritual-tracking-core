@@ -41,6 +41,11 @@ export interface CreateLeadInput {
   // recoverable even when this table's fixed columns don't cover it.
   eventMetadata?: Record<string, unknown>;
   isTest?: boolean;
+  // See visitors.ts's testRunId comment. Stamped on the lead, its canonical
+  // "lead" event, and the linked visitor (the visitor update mirrors the
+  // existing isTest pattern below: conditional, never clears a value the
+  // visitor already had from an earlier real test run).
+  testRunId?: string | null;
 }
 
 /**
@@ -114,6 +119,7 @@ export async function createLeadTransactional(
         fbp: input.fbp ?? null,
         fbc: input.fbc ?? null,
         isTest: input.isTest ?? false,
+        testRunId: input.testRunId ?? null,
       })
       .returning();
 
@@ -129,13 +135,18 @@ export async function createLeadTransactional(
         variantId: input.variantId ?? null,
         occurredAt: lead.createdAt,
         isTest: input.isTest ?? false,
+        testRunId: input.testRunId ?? null,
       });
     }
 
     if (input.visitorId) {
       await tx
         .update(visitors)
-        .set({ leadId: lead.id, ...(input.isTest ? { isTest: true } : {}) })
+        .set({
+          leadId: lead.id,
+          ...(input.isTest ? { isTest: true } : {}),
+          ...(input.testRunId ? { testRunId: input.testRunId } : {}),
+        })
         .where(eq(visitors.id, input.visitorId));
     }
 
