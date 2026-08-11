@@ -65,6 +65,23 @@ export const visitors = pgTable("visitors", {
   // analytics must filter is_test = false; nothing here is deleted, only
   // excluded from reporting.
   isTest: boolean("is_test").notNull().default(false),
+  // Test-mode isolation hardening: which specific test session/run produced
+  // this row, so a bad or exploratory test run can be identified and cleaned
+  // up precisely instead of by a blanket is_test scan. Null for rows created
+  // before this column existed, and for any real (non-test) row — never
+  // fabricated retroactively. Set once by the SDK's short-TTL test session,
+  // not escalate-only: a later touch with a NEW testRunId (a genuinely
+  // different test session on the same visitor) overwrites it, since the
+  // most recent test run is what matters for cleanup.
+  testRunId: uuid("test_run_id"),
+  // Set only when a re-audit finds insufficient evidence to confidently
+  // confirm OR reject an existing is_test=true classification (e.g. a
+  // heuristic guess made before this column existed). Null means "no review
+  // flag" — either genuinely real (is_test=false) or confidently classified
+  // test data, not "verified real." Deliberately does not change is_test
+  // itself: an uncertain row stays excluded from production analytics
+  // (the safer default) until a human resolves it.
+  testClassification: varchar("test_classification", { length: 32 }),
 
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -110,6 +127,10 @@ export const sessions = pgTable(
     siteKey: varchar("site_key", { length: 64 }).notNull(),
     isBot: boolean("is_bot").notNull().default(false),
     isTest: boolean("is_test").notNull().default(false),
+    // See visitors.testRunId — same purpose, set fresh at creation from the
+    // SDK's current test session (never escalate-only: a new session for the
+    // same visitor legitimately gets its own testRunId).
+    testRunId: uuid("test_run_id"),
   },
   (table) => [
     index("sessions_visitor_id_idx").on(table.visitorId),
@@ -136,6 +157,8 @@ export const events = pgTable(
     experimentId: uuid("experiment_id"),
     variantId: uuid("variant_id"),
     isTest: boolean("is_test").notNull().default(false),
+    // See visitors.testRunId.
+    testRunId: uuid("test_run_id"),
   },
   (table) => [
     index("events_visitor_id_idx").on(table.visitorId),
@@ -193,6 +216,8 @@ export const leads = pgTable(
     ravMesserError: text("rav_messer_error"),
 
     isTest: boolean("is_test").notNull().default(false),
+    // See visitors.testRunId.
+    testRunId: uuid("test_run_id"),
 
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },

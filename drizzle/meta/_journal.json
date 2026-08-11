@@ -22,6 +22,13 @@
       "when": 1786453220868,
       "tag": "0002_mysterious_randall",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786460959645,
+      "tag": "0003_volatile_masque",
+      "breakpoints": true
     }
   ]
 }
