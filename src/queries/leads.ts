@@ -56,8 +56,17 @@ export interface CreateLeadInput {
  * near-simultaneous requests from a real double-click can't both pass the
  * duplicate check before either commits), and a lead created for the same
  * email+visitor within the last 30s is returned as-is instead of duplicated.
+ *
+ * Returns `isDuplicate: true` on the dedup-hit path so callers (namely: the
+ * downstream Meta/Rav Messer dispatch) can skip re-running side effects for
+ * a lead that already had them run — a duplicate lead row is prevented, but
+ * without this flag a duplicate *submission* would still fire a second CAPI
+ * call and queue a second retry job for the exact same lead.
  */
-export async function createLeadTransactional(db: TrackingDb, input: CreateLeadInput) {
+export async function createLeadTransactional(
+  db: TrackingDb,
+  input: CreateLeadInput,
+): Promise<{ lead: typeof leads.$inferSelect; isDuplicate: boolean }> {
   return db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${input.email}))`);
 
@@ -70,7 +79,7 @@ export async function createLeadTransactional(db: TrackingDb, input: CreateLeadI
       ),
     });
     if (recentDuplicate) {
-      return recentDuplicate;
+      return { lead: recentDuplicate, isDuplicate: true };
     }
 
     const leadId = randomUUID();
@@ -124,6 +133,6 @@ export async function createLeadTransactional(db: TrackingDb, input: CreateLeadI
       await tx.update(visitors).set({ leadId: lead.id }).where(eq(visitors.id, input.visitorId));
     }
 
-    return lead;
+    return { lead, isDuplicate: false };
   });
 }

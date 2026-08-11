@@ -17,11 +17,12 @@ const SESSION_ID = "e0000000-0000-0000-0000-000000000002";
 async function seedLead(db: Awaited<ReturnType<typeof createTestDb>>) {
   await db.insert(visitors).values({ id: VISITOR_ID });
   await db.insert(sessions).values({ id: SESSION_ID, visitorId: VISITOR_ID, siteKey: "main" });
-  return createLeadTransactional(db, {
+  const { lead } = await createLeadTransactional(db, {
     visitorId: VISITOR_ID,
     sessionId: SESSION_ID,
     email: `job-test-${Math.random()}@example.com`,
   });
+  return lead;
 }
 
 describe("ravMesserSyncJobs", () => {

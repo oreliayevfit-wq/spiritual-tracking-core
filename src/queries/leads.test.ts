@@ -16,7 +16,7 @@ describe("createLeadTransactional", () => {
     const db = await createTestDb();
     await seed(db);
 
-    const lead = await createLeadTransactional(db, {
+    const { lead, isDuplicate } = await createLeadTransactional(db, {
       visitorId: VISITOR_ID,
       sessionId: SESSION_ID,
       email: "test@example.com",
@@ -24,6 +24,7 @@ describe("createLeadTransactional", () => {
       lastTouchSource: "google",
     });
 
+    expect(isDuplicate).toBe(false);
     expect(lead.email).toBe("test@example.com");
     expect(lead.firstTouchSource).toBe("facebook");
     expect(lead.lastTouchSource).toBe("google");
@@ -59,13 +60,13 @@ describe("createLeadTransactional", () => {
   it("creates a lead without visitor/session context (edge case) without throwing", async () => {
     const db = await createTestDb();
 
-    const lead = await createLeadTransactional(db, { email: "no-context@example.com" });
+    const { lead } = await createLeadTransactional(db, { email: "no-context@example.com" });
 
     expect(lead.email).toBe("no-context@example.com");
     expect(lead.visitorId).toBeNull();
   });
 
-  it("returns the same lead instead of duplicating on a rapid repeat submission (same email+visitor)", async () => {
+  it("returns the same lead and isDuplicate:true on a rapid repeat submission (same email+visitor)", async () => {
     const db = await createTestDb();
     await seed(db);
 
@@ -80,12 +81,14 @@ describe("createLeadTransactional", () => {
       email: "dup@example.com",
     });
 
-    expect(second.id).toBe(first.id);
+    expect(first.isDuplicate).toBe(false);
+    expect(second.isDuplicate).toBe(true);
+    expect(second.lead.id).toBe(first.lead.id);
     const rows = await db.select().from(leads).where(eq(leads.email, "dup@example.com"));
     expect(rows).toHaveLength(1);
   });
 
-  it("does NOT merge two concurrent submissions racing each other (advisory lock serializes them)", async () => {
+  it("does NOT merge two concurrent submissions racing each other, and flags exactly one as the duplicate", async () => {
     const db = await createTestDb();
     await seed(db);
 
@@ -94,7 +97,11 @@ describe("createLeadTransactional", () => {
       createLeadTransactional(db, { visitorId: VISITOR_ID, sessionId: SESSION_ID, email: "race@example.com" }),
     ]);
 
-    expect(a.id).toBe(b.id);
+    expect(a.lead.id).toBe(b.lead.id);
+    // The advisory lock serializes them — exactly one of the two calls did
+    // the real insert, the other saw it as a duplicate. Never both false,
+    // never both true.
+    expect([a.isDuplicate, b.isDuplicate].sort()).toEqual([false, true]);
     const rows = await db.select().from(leads).where(eq(leads.email, "race@example.com"));
     expect(rows).toHaveLength(1);
   });
@@ -108,7 +115,9 @@ describe("createLeadTransactional", () => {
     const first = await createLeadTransactional(db, { visitorId: VISITOR_ID, email: "shared@example.com" });
     const second = await createLeadTransactional(db, { visitorId: otherVisitorId, email: "shared@example.com" });
 
-    expect(second.id).not.toBe(first.id);
+    expect(first.isDuplicate).toBe(false);
+    expect(second.isDuplicate).toBe(false);
+    expect(second.lead.id).not.toBe(first.lead.id);
     const rows = await db.select().from(leads).where(eq(leads.email, "shared@example.com"));
     expect(rows).toHaveLength(2);
   });
@@ -121,11 +130,12 @@ describe("createLeadTransactional", () => {
     await db
       .update(leads)
       .set({ createdAt: new Date(Date.now() - 60_000) })
-      .where(eq(leads.id, first.id));
+      .where(eq(leads.id, first.lead.id));
 
     const second = await createLeadTransactional(db, { visitorId: VISITOR_ID, email: "later@example.com" });
 
-    expect(second.id).not.toBe(first.id);
+    expect(second.isDuplicate).toBe(false);
+    expect(second.lead.id).not.toBe(first.lead.id);
     const rows = await db.select().from(leads).where(eq(leads.email, "later@example.com"));
     expect(rows).toHaveLength(2);
   });

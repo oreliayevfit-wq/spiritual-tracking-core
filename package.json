@@ -1,6 +1,6 @@
 {
   "name": "@spiritual/tracking-core",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": false,
   "description": "Shared Drizzle schema + typed query helpers for spiritual-* marketing tracking (visitors/sessions/events/leads). Consumed as a git-tag-pinned dependency by spiritual-marketing-site and spiritual-business-dashboard.",
   "main": "./dist/index.js",
