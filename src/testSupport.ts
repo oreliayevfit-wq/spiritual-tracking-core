@@ -52,6 +52,7 @@ export async function createTestDb(): Promise<TrackingDb> {
       browser varchar(64),
       os varchar(64),
       lead_id uuid,
+      is_test boolean NOT NULL DEFAULT false,
       created_at timestamptz NOT NULL DEFAULT now()
     );
   `);
@@ -86,7 +87,8 @@ export async function createTestDb(): Promise<TrackingDb> {
       screen_size varchar(32),
       language varchar(32),
       site_key varchar(64) NOT NULL,
-      is_bot boolean NOT NULL DEFAULT false
+      is_bot boolean NOT NULL DEFAULT false,
+      is_test boolean NOT NULL DEFAULT false
     );
   `);
 
@@ -100,7 +102,8 @@ export async function createTestDb(): Promise<TrackingDb> {
       occurred_at timestamptz NOT NULL DEFAULT now(),
       metadata jsonb,
       experiment_id uuid,
-      variant_id uuid
+      variant_id uuid,
+      is_test boolean NOT NULL DEFAULT false
     );
   `);
 
@@ -137,6 +140,7 @@ export async function createTestDb(): Promise<TrackingDb> {
       rav_messer_sync_status varchar(16) NOT NULL DEFAULT 'pending',
       rav_messer_synced_at timestamptz,
       rav_messer_error text,
+      is_test boolean NOT NULL DEFAULT false,
       created_at timestamptz NOT NULL DEFAULT now()
     );
   `);
@@ -158,6 +162,7 @@ export async function createTestDb(): Promise<TrackingDb> {
       level varchar(16) NOT NULL,
       message text NOT NULL,
       context jsonb,
+      is_test boolean NOT NULL DEFAULT false,
       created_at timestamptz NOT NULL DEFAULT now()
     );
   `);
@@ -170,6 +175,7 @@ export async function createTestDb(): Promise<TrackingDb> {
       status varchar(16) NOT NULL DEFAULT 'pending',
       last_error text,
       next_attempt_at timestamptz NOT NULL DEFAULT now(),
+      is_test boolean NOT NULL DEFAULT false,
       created_at timestamptz NOT NULL DEFAULT now(),
       updated_at timestamptz NOT NULL DEFAULT now()
     );

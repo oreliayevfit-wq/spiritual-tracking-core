@@ -139,4 +139,40 @@ describe("createLeadTransactional", () => {
     const rows = await db.select().from(leads).where(eq(leads.email, "later@example.com"));
     expect(rows).toHaveLength(2);
   });
+
+  it("marks the lead, its canonical event, and the linked visitor as test when isTest is set", async () => {
+    const db = await createTestDb();
+    await seed(db);
+
+    const { lead } = await createLeadTransactional(db, {
+      visitorId: VISITOR_ID,
+      sessionId: SESSION_ID,
+      email: "marked-test@example.com",
+      isTest: true,
+    });
+
+    expect(lead.isTest).toBe(true);
+
+    const [leadEvent] = await db
+      .select()
+      .from(events)
+      .where(eq(events.eventName, "lead"));
+    expect(leadEvent.isTest).toBe(true);
+
+    const [visitor] = await db.select().from(visitors).where(eq(visitors.id, VISITOR_ID));
+    expect(visitor.isTest).toBe(true);
+  });
+
+  it("defaults isTest to false when not specified", async () => {
+    const db = await createTestDb();
+    await seed(db);
+
+    const { lead } = await createLeadTransactional(db, {
+      visitorId: VISITOR_ID,
+      sessionId: SESSION_ID,
+      email: "not-marked@example.com",
+    });
+
+    expect(lead.isTest).toBe(false);
+  });
 });

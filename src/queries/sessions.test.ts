@@ -79,4 +79,25 @@ describe("upsertSession", () => {
     const [oldRow] = await db.select().from(sessions).where(eq(sessions.id, SESSION_ID));
     expect(oldRow.utmSource).toBe("facebook"); // untouched — a distinct row now
   });
+
+  it("propagates isTest on creation and never downgrades it on touch", async () => {
+    const db = await createTestDb();
+    await seedVisitor(db);
+
+    const created = await upsertSession(db, {
+      sessionId: SESSION_ID,
+      visitorId: VISITOR_ID,
+      siteKey: "main",
+      isTest: true,
+    });
+    expect(created.isTest).toBe(true);
+
+    const touched = await upsertSession(db, {
+      sessionId: SESSION_ID,
+      visitorId: VISITOR_ID,
+      siteKey: "main",
+      isTest: false,
+    });
+    expect(touched.isTest).toBe(true);
+  });
 });

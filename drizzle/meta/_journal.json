@@ -15,6 +15,13 @@
       "when": 1786267825409,
       "tag": "0001_nosy_matthew_murdock",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786453220868,
+      "tag": "0002_mysterious_randall",
+      "breakpoints": true
     }
   ]
 }

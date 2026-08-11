@@ -23,6 +23,7 @@ export interface VisitorTouchInput {
   deviceType?: string | null;
   browser?: string | null;
   os?: string | null;
+  isTest?: boolean;
 }
 
 /**
@@ -73,6 +74,7 @@ export async function upsertVisitor(db: TrackingDb, input: VisitorTouchInput) {
         deviceType: input.deviceType ?? null,
         browser: input.browser ?? null,
         os: input.os ?? null,
+        isTest: input.isTest ?? false,
       })
       .returning();
     return row;
@@ -92,6 +94,10 @@ export async function upsertVisitor(db: TrackingDb, input: VisitorTouchInput) {
       browser: input.browser ?? existing.browser,
       os: input.os ?? existing.os,
       fbp: input.fbp ?? existing.fbp,
+      // Escalate-only: once a visitor has been touched by test traffic even
+      // once, it stays flagged as test forever — never downgraded back to
+      // false by a later non-test touch.
+      isTest: existing.isTest || (input.isTest ?? false),
       ...(touched
         ? {
             lastTouchSource: input.source ?? null,

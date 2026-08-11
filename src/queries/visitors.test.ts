@@ -82,4 +82,19 @@ describe("upsertVisitor", () => {
     const [persisted] = await db.select().from(visitors).where(eq(visitors.id, id));
     expect(persisted.lastSeenAt.getTime()).toBe(second.lastSeenAt.getTime());
   });
+
+  it("defaults isTest to false, and once a visitor is touched as test it stays test", async () => {
+    const db = await createTestDb();
+    const id = "77777777-7777-7777-7777-777777777777";
+
+    const first = await upsertVisitor(db, { visitorId: id });
+    expect(first.isTest).toBe(false);
+
+    const marked = await upsertVisitor(db, { visitorId: id, isTest: true });
+    expect(marked.isTest).toBe(true);
+
+    // A later non-test touch must not un-mark it — escalate-only.
+    const after = await upsertVisitor(db, { visitorId: id, isTest: false });
+    expect(after.isTest).toBe(true);
+  });
 });

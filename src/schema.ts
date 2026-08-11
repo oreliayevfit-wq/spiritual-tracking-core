@@ -59,6 +59,13 @@ export const visitors = pgTable("visitors", {
 
   leadId: uuid("lead_id"),
 
+  // Explicitly marked by the caller (QA scripts, or a real browser via the
+  // SDK's test-mode query param) — never inferred from patterns like the
+  // email domain, since that's guessable and unreliable. Production
+  // analytics must filter is_test = false; nothing here is deleted, only
+  // excluded from reporting.
+  isTest: boolean("is_test").notNull().default(false),
+
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -102,8 +109,12 @@ export const sessions = pgTable(
 
     siteKey: varchar("site_key", { length: 64 }).notNull(),
     isBot: boolean("is_bot").notNull().default(false),
+    isTest: boolean("is_test").notNull().default(false),
   },
-  (table) => [index("sessions_visitor_id_idx").on(table.visitorId)],
+  (table) => [
+    index("sessions_visitor_id_idx").on(table.visitorId),
+    index("sessions_is_test_idx").on(table.isTest),
+  ],
 );
 
 export const events = pgTable(
@@ -124,12 +135,14 @@ export const events = pgTable(
     metadata: jsonb("metadata"),
     experimentId: uuid("experiment_id"),
     variantId: uuid("variant_id"),
+    isTest: boolean("is_test").notNull().default(false),
   },
   (table) => [
     index("events_visitor_id_idx").on(table.visitorId),
     index("events_session_id_idx").on(table.sessionId),
     index("events_event_name_idx").on(table.eventName),
     index("events_occurred_at_idx").on(table.occurredAt),
+    index("events_is_test_idx").on(table.isTest),
   ],
 );
 
@@ -179,9 +192,11 @@ export const leads = pgTable(
     ravMesserSyncedAt: timestamp("rav_messer_synced_at", { withTimezone: true }),
     ravMesserError: text("rav_messer_error"),
 
+    isTest: boolean("is_test").notNull().default(false),
+
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [index("leads_email_idx").on(table.email)],
+  (table) => [index("leads_email_idx").on(table.email), index("leads_is_test_idx").on(table.isTest)],
 );
 
 // Allowlist of embeddable sites: siteKey is public (like a GA Measurement ID, not a
@@ -208,11 +223,13 @@ export const integrationLogs = pgTable(
     level: varchar("level", { length: 16 }).notNull(),
     message: text("message").notNull(),
     context: jsonb("context"),
+    isTest: boolean("is_test").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     index("integration_logs_source_idx").on(table.source),
     index("integration_logs_created_at_idx").on(table.createdAt),
+    index("integration_logs_is_test_idx").on(table.isTest),
   ],
 );
 
@@ -234,6 +251,7 @@ export const ravMesserSyncJobs = pgTable(
     status: varchar("status", { length: 16 }).notNull().default("pending"),
     lastError: text("last_error"),
     nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().defaultNow(),
+    isTest: boolean("is_test").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

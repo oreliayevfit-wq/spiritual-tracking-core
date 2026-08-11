@@ -40,6 +40,7 @@ export interface CreateLeadInput {
   // column here. Full fidelity of what the visitor actually submitted stays
   // recoverable even when this table's fixed columns don't cover it.
   eventMetadata?: Record<string, unknown>;
+  isTest?: boolean;
 }
 
 /**
@@ -112,6 +113,7 @@ export async function createLeadTransactional(
         fbclid: input.fbclid ?? null,
         fbp: input.fbp ?? null,
         fbc: input.fbc ?? null,
+        isTest: input.isTest ?? false,
       })
       .returning();
 
@@ -126,11 +128,15 @@ export async function createLeadTransactional(
         experimentId: input.experimentId ?? null,
         variantId: input.variantId ?? null,
         occurredAt: lead.createdAt,
+        isTest: input.isTest ?? false,
       });
     }
 
     if (input.visitorId) {
-      await tx.update(visitors).set({ leadId: lead.id }).where(eq(visitors.id, input.visitorId));
+      await tx
+        .update(visitors)
+        .set({ leadId: lead.id, ...(input.isTest ? { isTest: true } : {}) })
+        .where(eq(visitors.id, input.visitorId));
     }
 
     return { lead, isDuplicate: false };

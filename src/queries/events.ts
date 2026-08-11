@@ -11,6 +11,7 @@ export interface EventInput {
   experimentId?: string | null;
   variantId?: string | null;
   occurredAt?: Date;
+  isTest?: boolean;
 }
 
 export async function insertEvent(db: TrackingDb, input: EventInput) {
@@ -26,6 +27,7 @@ export async function insertEvent(db: TrackingDb, input: EventInput) {
       experimentId: input.experimentId ?? null,
       variantId: input.variantId ?? null,
       occurredAt: input.occurredAt ?? new Date(),
+      isTest: input.isTest ?? false,
     })
     .returning();
   return row;

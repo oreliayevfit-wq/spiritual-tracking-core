@@ -32,6 +32,7 @@ export interface SessionInput {
   os?: string | null;
   screenSize?: string | null;
   language?: string | null;
+  isTest?: boolean;
 }
 
 /**
@@ -79,6 +80,7 @@ export async function upsertSession(db: TrackingDb, input: SessionInput) {
         os: input.os ?? null,
         screenSize: input.screenSize ?? null,
         language: input.language ?? null,
+        isTest: input.isTest ?? false,
       })
       .returning();
     return row;
@@ -86,7 +88,7 @@ export async function upsertSession(db: TrackingDb, input: SessionInput) {
 
   const [row] = await db
     .update(sessions)
-    .set({ lastSeenAt: now })
+    .set({ lastSeenAt: now, isTest: existing.isTest || (input.isTest ?? false) })
     .where(eq(sessions.id, existing.id))
     .returning();
   return row;

@@ -7,6 +7,7 @@ export interface LogIntegrationEventInput {
   level: IntegrationLogLevel;
   message: string;
   context?: Record<string, unknown>;
+  isTest?: boolean;
 }
 
 // Never throws — a logging failure must not be able to break the caller
@@ -19,6 +20,7 @@ export async function logIntegrationEvent(db: TrackingDb, input: LogIntegrationE
       level: input.level,
       message: input.message,
       context: input.context ?? null,
+      isTest: input.isTest ?? false,
     });
   } catch (error) {
     console.error("[integrationLogs] failed to write log row", error);

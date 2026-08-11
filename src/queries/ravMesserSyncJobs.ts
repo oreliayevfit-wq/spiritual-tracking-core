@@ -3,10 +3,10 @@ import { eq, sql } from "drizzle-orm";
 import { leads, ravMesserSyncJobs } from "../schema";
 import type { TrackingDb } from "../client";
 
-export async function enqueueRavMesserSyncJob(db: TrackingDb, leadId: string) {
+export async function enqueueRavMesserSyncJob(db: TrackingDb, leadId: string, isTest = false) {
   const [job] = await db
     .insert(ravMesserSyncJobs)
-    .values({ id: randomUUID(), leadId, status: "pending" })
+    .values({ id: randomUUID(), leadId, status: "pending", isTest })
     .returning();
   return job;
 }

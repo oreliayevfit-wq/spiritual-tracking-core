@@ -23,4 +23,27 @@ describe("insertEvent", () => {
     expect(row.eventName).toBe("cta_click");
     expect(row.metadata).toEqual({ buttonId: "hero-cta" });
   });
+
+  it("defaults isTest to false but honors an explicit true", async () => {
+    const db = await createTestDb();
+    await db.insert(visitors).values({ id: VISITOR_ID });
+    await db.insert(sessions).values({ id: SESSION_ID, visitorId: VISITOR_ID, siteKey: "main" });
+
+    const normal = await insertEvent(db, {
+      id: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeef",
+      visitorId: VISITOR_ID,
+      sessionId: SESSION_ID,
+      eventName: "page_view",
+    });
+    expect(normal.isTest).toBe(false);
+
+    const test = await insertEvent(db, {
+      id: "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeee0",
+      visitorId: VISITOR_ID,
+      sessionId: SESSION_ID,
+      eventName: "page_view",
+      isTest: true,
+    });
+    expect(test.isTest).toBe(true);
+  });
 });
